@@ -19,8 +19,8 @@ async fn main() -> anyhow::Result<()> {
     match peer {
         None => receiver::listen(endpoint).await?,
         Some(id) => {
-        let path = path.expect("use like this: cargo run -- <id> <path>");
-        sender::send_file(endpoint, id, path).await?
+            let path = path.expect("use like this: cargo run -- <id> <path>");
+            sender::send_file(endpoint, id, path).await?
         }
     }
 
@@ -33,5 +33,7 @@ async fn wait_until_online(endpoint: &Endpoint) {
         .is_err()
     {
         println!("no connection, check wifi (retrying all 5 seconds)...");
+        // im moment braucht es noch internet zugang.
+        // Werden wir später ändern oder auch nicht je nach dem müssen wir besprechen.
     }
 }

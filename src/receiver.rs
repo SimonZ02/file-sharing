@@ -4,11 +4,11 @@ use iroh::{
     protocol::{AcceptError, ProtocolHandler, Router},
 };
 
-use crate::ALPN;
+use crate::{ALPN, protocol::{read_message}};
 
 /*
 Receiver: open to receive files.
-- starts first and waits to be discovered by senders (like AirDrop or Quick Share)
+- starts first and waits to be discovered by senders (like AirDrop)
 */
 
 const MAX_FILE_SIZE: usize = 10_000_000; // 10mb
@@ -34,6 +34,16 @@ impl ProtocolHandler for FileHandler {
         println!("a sender connected!");
 
         while let Ok((mut send, mut recv)) = connection.accept_bi().await {
+
+            let offer = match read_message(&mut recv).await {
+                Ok(offer) => offer,
+                Err(e) => {
+                    println!("could not read message: {e}");
+                    continue;
+                }
+            };
+            println!("{:?}", offer);
+
             let bytes = match recv.read_to_end(MAX_FILE_SIZE).await {
                 Ok(bytes) => bytes,
                 Err(e) => {
