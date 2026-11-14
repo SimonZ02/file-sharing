@@ -4,7 +4,7 @@ use iroh::{
     protocol::{AcceptError, ProtocolHandler, Router},
 };
 
-use crate::{ALPN, protocol::{read_message}};
+use crate::{ALPN, protocol::{read_message, Message}};
 
 /*
 Receiver: open to receive files.
@@ -43,6 +43,15 @@ impl ProtocolHandler for FileHandler {
                 }
             };
             println!("{:?}", offer);
+
+            let file_name = match offer {
+                Message::Offer {file_name, ..} => file_name,
+                _ => {println!("offer not correct");
+                continue;
+                }
+            };
+            println!("this is the file_name: {}", file_name);
+
 
             let bytes = match recv.read_to_end(MAX_FILE_SIZE).await {
                 Ok(bytes) => bytes,
