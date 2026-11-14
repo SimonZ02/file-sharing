@@ -15,7 +15,7 @@ Receiver: open to receive files.
 
 const MAX_FILE_SIZE: usize = 10_000_000; // 10mb
 
-// const SAVE_PATH: &str = "received.bin";
+const TEST_DIR: &str = "test_downloads"; // ist temporär, werden wir dann mit dem UI auswählen denke ich (falls wir das wollen)
 
 pub async fn listen(endpoint: Endpoint) -> anyhow::Result<()> {
     println!("my id: {}", endpoint.id());
@@ -74,8 +74,15 @@ impl ProtocolHandler for FileHandler {
                 }
             };
 
+            if let Err(e) = tokio::fs::create_dir_all(TEST_DIR).await {
+                println!("could not create dir: {}", e);
+                continue;
+            }
 
-            if let Err(e) = tokio::fs::write(file_name, &bytes).await {
+            let final_path = Path::new(TEST_DIR).join(file_name);
+
+
+            if let Err(e) = tokio::fs::write(final_path, &bytes).await {
                 println!("could not save file: {e}");
                 continue;
             }
