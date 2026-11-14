@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use iroh::{
     Endpoint,
     endpoint::Connection,
@@ -13,7 +15,7 @@ Receiver: open to receive files.
 
 const MAX_FILE_SIZE: usize = 10_000_000; // 10mb
 
-const SAVE_PATH: &str = "received.bin";
+// const SAVE_PATH: &str = "received.bin";
 
 pub async fn listen(endpoint: Endpoint) -> anyhow::Result<()> {
     println!("my id: {}", endpoint.id());
@@ -44,13 +46,24 @@ impl ProtocolHandler for FileHandler {
             };
             println!("{:?}", offer);
 
-            let file_name = match offer {
+            let file_name_raw = match offer {
                 Message::Offer {file_name, ..} => file_name,
                 _ => {println!("offer not correct");
                 continue;
                 }
             };
-            println!("this is the file_name: {}", file_name);
+            println!("this is the file_name: {}", file_name_raw);
+
+            let file_path = Path::new(&file_name_raw);
+
+            let file_name = match file_path.file_name() {
+                Some(file_name) => file_name,
+                None => { println!("could not resolve file_name from given path");
+                            continue;
+            }
+
+            };
+
 
 
             let bytes = match recv.read_to_end(MAX_FILE_SIZE).await {
@@ -61,11 +74,12 @@ impl ProtocolHandler for FileHandler {
                 }
             };
 
-            if let Err(e) = tokio::fs::write(SAVE_PATH, &bytes).await {
+
+            if let Err(e) = tokio::fs::write(file_name, &bytes).await {
                 println!("could not save file: {e}");
                 continue;
             }
-            println!("saved {} bytes to {SAVE_PATH}", bytes.len());
+            println!("saved {} bytes as {}", bytes.len(),file_name.to_string_lossy());
 
             let reply = format!("saved {} bytes", bytes.len());
             if let Err(e) = send.write_all(reply.as_bytes()).await {
