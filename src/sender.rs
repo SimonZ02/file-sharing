@@ -1,6 +1,9 @@
 use iroh::{Endpoint, EndpointId};
 
-use crate::{ALPN, protocol::{Message, send_message}};
+use crate::{
+    ALPN,
+    protocol::{Message, send_message},
+};
 
 /*
 Sender: has the file.
@@ -17,7 +20,10 @@ pub async fn send_file(endpoint: Endpoint, id: String, path: String) -> anyhow::
     let bytes = tokio::fs::read(&path).await?;
     println!("sending {} bytes", bytes.len());
 
-    let offer = Message::Offer { file_name: path, size: bytes.len() as u64};
+    let offer = Message::Offer {
+        file_name: path,
+        size: bytes.len() as u64,
+    };
     println!("{:?}", offer);
 
     let (mut send, mut recv) = connection.open_bi().await?;

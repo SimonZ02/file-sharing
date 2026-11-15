@@ -5,8 +5,8 @@ mod sender;
 use iroh::{Endpoint, endpoint::presets};
 use iroh_mdns_address_lookup::{DiscoveryEvent, MdnsAddressLookup};
 use n0_future::StreamExt;
-use std::time::Duration;
 use std::collections::HashSet;
+use std::time::Duration;
 use tokio::time::timeout;
 
 const ALPN: &[u8] = b"iroh-file/0";
@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
     let endpoint = Endpoint::bind(presets::N0).await?;
     let mdns = MdnsAddressLookup::builder().build(endpoint.id())?;
     endpoint.address_lookup()?.add(mdns.clone());
-    
+
     wait_until_online(&endpoint).await;
 
     match peer.as_deref() {
@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
             sender::send_file(endpoint, id.to_string(), path).await?
         }
     }
-    
+
     Ok(())
 }
 

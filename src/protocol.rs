@@ -17,7 +17,6 @@ pub async fn send_message(send: &mut SendStream, message: &Message) -> anyhow::R
 }
 
 pub async fn read_message(recv: &mut RecvStream) -> anyhow::Result<Message> {
-
     let mut bytes_length = [0u8; 4];
     recv.read_exact(&mut bytes_length).await?;
 
