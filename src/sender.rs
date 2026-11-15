@@ -1,8 +1,10 @@
+use std::fs::read_dir;
+
 use iroh::{Endpoint, EndpointId};
 
 use crate::{
     ALPN,
-    protocol::{Message, send_message},
+    protocol::{Message, read_message, send_message},
 };
 
 /*
@@ -29,6 +31,24 @@ pub async fn send_file(endpoint: Endpoint, id: String, path: String) -> anyhow::
     let (mut send, mut recv) = connection.open_bi().await?;
 
     send_message(&mut send, &offer).await?;
+
+    let answer = match read_message(&mut recv).await {
+        Ok(answer) => answer,
+        Err(e) => {
+            anyhow::bail!("could not read message: {e}");
+        }
+    };
+
+    let accepted = match answer {
+        Message::Answer { accepted } => accepted,
+        _ => anyhow::bail!("expected an answer"),
+    };
+
+    if !accepted {
+        println!("denied by receiver");
+        endpoint.close().await;
+        return Ok(());
+    };
 
     send.write_all(&bytes).await?;
     send.finish()?;

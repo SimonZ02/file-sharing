@@ -8,7 +8,9 @@ use iroh::{
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::{
-    ALPN, protocol::{Message, read_message, send_message}, sender::send_file,
+    ALPN,
+    protocol::{Message, read_message, send_message},
+    sender::send_file,
 };
 
 /*
@@ -52,11 +54,10 @@ impl ProtocolHandler for FileHandler {
 async fn handle_transfer(mut send: SendStream, mut recv: RecvStream) -> anyhow::Result<()> {
     let (file_name, file_size) = read_offer(&mut recv).await?;
 
-    let accepted = ask_user(&file_name, file_size).await;  
+    let accepted = ask_user(&file_name, file_size).await;
 
     let message = Message::Answer { accepted };
     send_message(&mut send, &message).await?;
-
 
     if !accepted {
         send.finish()?;
@@ -65,7 +66,6 @@ async fn handle_transfer(mut send: SendStream, mut recv: RecvStream) -> anyhow::
         return Ok(());
     }
 
- 
     let bytes = match recv.read_to_end(MAX_FILE_SIZE).await {
         Ok(bytes) => bytes,
         Err(e) => {
@@ -114,7 +114,10 @@ async fn read_offer(recv: &mut RecvStream) -> anyhow::Result<(String, u64)> {
 }
 
 async fn ask_user(file_name: &str, file_size: u64) -> bool {
-    println!("received an offer: file_name = {} and size = {}", file_name, file_size);
+    println!(
+        "received an offer: file_name = {} and size = {}",
+        file_name, file_size
+    );
     println!("Do you want to receive this file [y/n]?");
 
     let mut stdin = BufReader::new(tokio::io::stdin()).lines();
