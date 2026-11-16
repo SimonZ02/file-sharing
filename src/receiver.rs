@@ -18,8 +18,6 @@ Receiver: open to receive files.
 - starts first and waits to be discovered by senders (like AirDrop)
 */
 
-const MAX_FILE_SIZE: usize = 10_000_000; // 10mb
-
 const TEST_DIR: &str = "test_downloads"; // ist temporär, werden wir dann mit dem UI auswählen denke ich (falls wir das wollen)
 
 pub async fn listen(endpoint: Endpoint) -> anyhow::Result<()> {
@@ -66,16 +64,9 @@ async fn handle_transfer(mut send: SendStream, mut recv: RecvStream) -> anyhow::
         return Ok(());
     }
 
-    let bytes = match recv.read_to_end(MAX_FILE_SIZE).await {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            anyhow::bail!("could not read file: {e}");
-        }
-    };
+    let received = save_file(&file_name, &mut recv).await?;
 
-    save_file(&file_name, &bytes).await?;
-
-    let reply = format!("saved {} bytes", bytes.len());
+    let reply = format!("saved {} bytes", received);
     if let Err(e) = send.write_all(reply.as_bytes()).await {
         anyhow::bail!("could not reply: {e}");
     }
@@ -139,17 +130,16 @@ async fn ask_user(file_name: &str, file_size: u64) -> bool {
     accepted
 }
 
-async fn save_file(file_name: &str, bytes: &[u8]) -> anyhow::Result<()> {
+async fn save_file(file_name: &str, recv: &mut RecvStream) -> anyhow::Result<u64> {
     if let Err(e) = tokio::fs::create_dir_all(TEST_DIR).await {
         anyhow::bail!("could not create dir: {}", e);
     }
 
     let final_path = Path::new(TEST_DIR).join(file_name);
 
-    if let Err(e) = tokio::fs::write(final_path, bytes).await {
-        anyhow::bail!("could not save file: {e}");
-    }
-    println!("saved {} bytes as {}", bytes.len(), file_name);
+    let mut file = tokio::fs::File::create(&final_path).await?;
+    let received = tokio::io::copy(recv, &mut file).await?;
+    println!("saved {} bytes as {}", received, file_name);
 
-    Ok(())
+    Ok(received)
 }

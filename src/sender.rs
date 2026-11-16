@@ -1,4 +1,4 @@
-use std::fs::read_dir;
+use std::path::Path;
 
 use iroh::{Endpoint, EndpointId};
 
@@ -19,13 +19,21 @@ pub async fn send_file(endpoint: Endpoint, id: String, path: String) -> anyhow::
     let connection = endpoint.connect(peer_id, ALPN).await?;
     println!("connection successful");
 
-    let bytes = tokio::fs::read(&path).await?;
-    println!("sending {} bytes", bytes.len());
+    let metadata = tokio::fs::metadata(&path).await?;
+    let file_size = metadata.len();
+
+    println!("sending {} bytes", file_size);
+
+    let file_name = match Path::new(&path).file_name() {
+        Some(n) => n.to_string_lossy().to_string(),
+        None => anyhow::bail!("strange path detected"),
+    };
 
     let offer = Message::Offer {
-        file_name: path,
-        size: bytes.len() as u64,
+        file_name: file_name,
+        size: file_size,
     };
+
     println!("{:?}", offer);
 
     let (mut send, mut recv) = connection.open_bi().await?;
@@ -50,7 +58,9 @@ pub async fn send_file(endpoint: Endpoint, id: String, path: String) -> anyhow::
         return Ok(());
     };
 
-    send.write_all(&bytes).await?;
+    let mut file = tokio::fs::File::open(&path).await?;
+
+    tokio::io::copy(&mut file, &mut send).await?;
     send.finish()?;
 
     let reply = recv.read_to_end(1000).await?;
