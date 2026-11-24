@@ -4,6 +4,7 @@ use iroh::{Endpoint, EndpointId};
 
 use crate::{
     ALPN,
+    file_utils::check_file,
     protocol::{Message, read_message, send_message},
 };
 
@@ -13,6 +14,7 @@ Sender: has the file.
 */
 
 pub async fn send_file(endpoint: Endpoint, id: String, path: String) -> anyhow::Result<()> {
+    let file_info = check_file(&path)?;
     let peer_id: EndpointId = id.parse()?;
     println!("connecting ...");
 

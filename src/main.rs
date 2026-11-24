@@ -1,6 +1,7 @@
 mod protocol;
 mod receiver;
 mod sender;
+mod file_utils;
 
 use iroh::{Endpoint, endpoint::presets};
 use iroh_mdns_address_lookup::{DiscoveryEvent, MdnsAddressLookup};
