@@ -85,6 +85,19 @@ async fn handle_transfer(mut send: SendStream, mut recv: RecvStream) -> anyhow::
     Ok(())
 }
 
+fn validate_file_name(file_name: &str) -> anyhow::Result<()> {
+    if file_name.is_empty()
+        || file_name == "."
+        || file_name == ".."
+        || file_name.contains('/')
+        || file_name.contains('\\')
+    {
+        anyhow::bail!("Invalid file name: {}", file_name);
+    }
+
+    Ok(())
+}
+
 async fn read_offer(recv: &mut RecvStream) -> anyhow::Result<(String, u64)> {
     let offer = match read_message(recv).await {
         Ok(offer) => offer,
@@ -102,16 +115,11 @@ async fn read_offer(recv: &mut RecvStream) -> anyhow::Result<(String, u64)> {
     };
     println!("this is the file_name: {}", file_name_raw);
 
-    let file_path = Path::new(&file_name_raw);
+    validate_file_name(&file_name_raw)?;
 
-    let file_name = match file_path.file_name() {
-        Some(file_name) => file_name,
-        None => {
-            anyhow::bail!("could not resolve file_name from given path");
-        }
-    };
+    let file_name = file_name_raw;
 
-    Ok((file_name.to_string_lossy().to_string(), file_size))
+    Ok((file_name, file_size))
 }
 
 async fn ask_user(file_name: &str, file_size: u64) -> bool {
@@ -187,6 +195,47 @@ async fn delete_file(file_name: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_validate_file_name_accepts_normal_name() {
+        let result = validate_file_name("foto.png");
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_file_name_rejects_parent_directory() {
+        let result = validate_file_name("../foto.png");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_file_name_rejects_windows_path() {
+        let result = validate_file_name(r"..\foto.png");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_file_name_rejects_empty_name() {
+        let result = validate_file_name("");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_file_name_rejects_subfolder() {
+        let result = validate_file_name("ordner/foto.png");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_file_name_rejects_dot_names() {
+        assert!(validate_file_name(".").is_err());
+        assert!(validate_file_name("..").is_err());
+    }
 
     struct FailingReader {
         sent_data: bool,
