@@ -66,6 +66,16 @@ async fn handle_transfer(mut send: SendStream, mut recv: RecvStream) -> anyhow::
 
     let received = save_file(&file_name, &mut recv).await?;
 
+    if received != file_size {
+        delete_file(&file_name).await?;
+
+        anyhow::bail!(
+        "File size mismatch: expected {} bytes, received {} bytes",
+        file_size,
+        received
+    );
+    }
+
     let reply = format!("saved {} bytes", received);
     if let Err(e) = send.write_all(reply.as_bytes()).await {
         anyhow::bail!("could not reply: {e}");
@@ -142,4 +152,36 @@ async fn save_file(file_name: &str, recv: &mut RecvStream) -> anyhow::Result<u64
     println!("saved {} bytes as {}", received, file_name);
 
     Ok(received)
+
+}
+
+async fn delete_file(file_name: &str) -> anyhow::Result<()> {
+    let file_path = Path::new(TEST_DIR).join(file_name);
+
+    tokio::fs::remove_file(&file_path).await?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_delete_file() {
+        let file_name = "test_delete_file.txt";
+        let file_path = Path::new(TEST_DIR).join(file_name);
+
+        // Create a test file
+        tokio::fs::create_dir_all(TEST_DIR).await.unwrap();
+        tokio::fs::write(&file_path, "test content")
+            .await
+            .unwrap();
+
+        // Delete the test file
+        delete_file(file_name).await.unwrap();
+
+        // Check that the file no longer exists
+        assert!(!file_path.exists());
+    }
 }
