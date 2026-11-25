@@ -141,31 +141,41 @@ async fn ask_user(file_name: &str, file_size: u64) -> bool {
 }
 
 async fn save_file(file_name: &str, recv: &mut RecvStream) -> anyhow::Result<u64> {
-    if let Err(e) = tokio::fs::create_dir_all(TEST_DIR).await {
-        anyhow::bail!("could not create dir: {}", e);
-    }
+    tokio::fs::create_dir_all(TEST_DIR).await?;
 
     let final_path = Path::new(TEST_DIR).join(file_name);
 
+    let received = copy_to_file(recv, &final_path).await?;
+
+    println!("saved {} bytes as {}", received, file_name);
+
+    Ok(received)
+}
+
+async fn copy_to_file<R>(
+    recv: &mut R,
+    final_path: &Path,
+) -> anyhow::Result<u64>
+where
+    R: tokio::io::AsyncRead + Unpin,
+{
     let mut file = tokio::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(&final_path)
+        .open(final_path)
         .await?;
+
     let received = match tokio::io::copy(recv, &mut file).await {
         Ok(received) => received,
         Err(e) => {
             drop(file);
-            let _ = tokio::fs::remove_file(&final_path).await;
+            let _ = tokio::fs::remove_file(final_path).await;
             anyhow::bail!("File transfer failed: {}", e);
         }
     };
-    println!("saved {} bytes as {}", received, file_name);
 
     Ok(received)
-
 }
-
 async fn delete_file(file_name: &str) -> anyhow::Result<()> {
     let file_path = Path::new(TEST_DIR).join(file_name);
 
@@ -177,6 +187,28 @@ async fn delete_file(file_name: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct FailingReader {
+        sent_data: bool,
+    }
+
+    impl tokio::io::AsyncRead for FailingReader {
+        fn poll_read(
+            mut self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+            buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            if !self.sent_data {
+                buf.put_slice(b"partial content");
+                self.sent_data = true;
+                std::task::Poll::Ready(Ok(()))
+            } else {
+                std::task::Poll::Ready(Err(std::io::Error::other(
+                    "simulated transfer failure",
+                )))
+            }
+        }
+    }
 
     #[tokio::test]
     async fn test_delete_file() {
@@ -226,5 +258,28 @@ mod tests {
 
         // Clean up
         tokio::fs::remove_file(&file_path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_incomplete_transfer_deletes_file() {
+        let file_name = "test_incomplete_transfer.txt";
+        let file_path = Path::new(TEST_DIR).join(file_name);
+
+        tokio::fs::create_dir_all(TEST_DIR).await.unwrap();
+
+        // Remove an old test file if it exists
+        let _ = tokio::fs::remove_file(&file_path).await;
+
+        // Create a reader that fails during transfer
+        let mut reader = FailingReader { sent_data: false };
+
+        // Try to copy the data
+        let result = copy_to_file(&mut reader, &file_path).await;
+
+        // Check that the transfer failed
+        assert!(result.is_err());
+
+        // Check that the incomplete file was deleted
+        assert!(!file_path.exists());
     }
 }
