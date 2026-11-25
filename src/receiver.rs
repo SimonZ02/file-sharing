@@ -152,7 +152,14 @@ async fn save_file(file_name: &str, recv: &mut RecvStream) -> anyhow::Result<u64
         .create_new(true)
         .open(&final_path)
         .await?;
-    let received = tokio::io::copy(recv, &mut file).await?;
+    let received = match tokio::io::copy(recv, &mut file).await {
+        Ok(received) => received,
+        Err(e) => {
+            drop(file);
+            let _ = tokio::fs::remove_file(&final_path).await;
+            anyhow::bail!("File transfer failed: {}", e);
+        }
+    };
     println!("saved {} bytes as {}", received, file_name);
 
     Ok(received)
