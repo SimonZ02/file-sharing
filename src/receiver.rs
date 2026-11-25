@@ -147,7 +147,11 @@ async fn save_file(file_name: &str, recv: &mut RecvStream) -> anyhow::Result<u64
 
     let final_path = Path::new(TEST_DIR).join(file_name);
 
-    let mut file = tokio::fs::File::create(&final_path).await?;
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&final_path)
+        .await?;
     let received = tokio::io::copy(recv, &mut file).await?;
     println!("saved {} bytes as {}", received, file_name);
 
@@ -183,5 +187,37 @@ mod tests {
 
         // Check that the file no longer exists
         assert!(!file_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_save_file_does_not_overwrite() {
+        let file_name = "test_existing_file.txt";
+        let file_path = Path::new(TEST_DIR).join(file_name);
+
+        // Create a file with existing content
+        tokio::fs::create_dir_all(TEST_DIR).await.unwrap();
+        tokio::fs::write(&file_path, "original content")
+            .await
+            .unwrap();
+
+        // Try to create the same file again
+        let result = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&file_path)
+            .await;
+
+        // Check that creating the file failed
+        assert!(result.is_err());
+
+        // Check that the original content is still there
+        let content = tokio::fs::read_to_string(&file_path)
+            .await
+            .unwrap();
+
+        assert_eq!(content, "original content");
+
+        // Clean up
+        tokio::fs::remove_file(&file_path).await.unwrap();
     }
 }
