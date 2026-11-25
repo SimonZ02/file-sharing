@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use iroh::{Endpoint, EndpointId};
 
 use crate::{
@@ -21,15 +19,11 @@ pub async fn send_file(endpoint: Endpoint, id: String, path: String) -> anyhow::
     let connection = endpoint.connect(peer_id, ALPN).await?;
     println!("connection successful");
 
-    let metadata = tokio::fs::metadata(&path).await?;
-    let file_size = metadata.len();
+    let file_size = file_info.size;
 
     println!("sending {} bytes", file_size);
 
-    let file_name = match Path::new(&path).file_name() {
-        Some(n) => n.to_string_lossy().to_string(),
-        None => anyhow::bail!("strange path detected"),
-    };
+    let file_name = file_info.name;
 
     let offer = Message::Offer {
         file_name: file_name,
